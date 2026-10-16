@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-=========================================================
-  ARSENAL DE AUDITORÍA Y ANÁLISIS  -  Termux Edition
-  Uso EXCLUSIVO en redes/dispositivos propios o con
-  autorización por escrito. El uso no autorizado es delito.
-=========================================================
+╔══════════════════════════════════════════════════════╗
+║   ARSENAL DE AUDITORÍA Y ANÁLISIS - Termux Edition  ║
+║   v2.2 · Uso en redes propias o autorizadas         ║
+╚══════════════════════════════════════════════════════╝
 """
 
 import os
@@ -20,7 +19,7 @@ import builtins
 from datetime import datetime
 from pathlib import Path
 
-# ============ TERMIOS (para Ctrl+X) ============
+# ============ TERMIOS ============
 try:
     import tty
     import termios
@@ -33,66 +32,63 @@ _input_original = builtins.input
 PALABRAS_ESCAPE = ("0", "atras", "atrás", "volver", "back", "b", "q", "salir", "exit")
 
 def input_raw(prompt=""):
-    """Lee input carácter a carácter. Ctrl+X sale del script."""
     sys.stdout.write(prompt)
     sys.stdout.flush()
-
     if not TIENE_TERMIOS or not sys.stdin.isatty():
         return _input_original()
-
     fd = sys.stdin.fileno()
     try:
         old_attrs = termios.tcgetattr(fd)
     except Exception:
         return _input_original()
-
     buffer = []
     salir = False
     try:
         tty.setraw(fd)
         while True:
-            ch = sys.stdin.read(1)
+            try:
+                ch = sys.stdin.read(1)
+            except Exception:
+                break
             if not ch:
                 raise EOFError
-            if ch == '\x18':          # Ctrl+X -> salir
+            if ch == '\x18':
                 salir = True
                 break
-            elif ch == '\x03':        # Ctrl+C -> KeyboardInterrupt
-                sys.stdout.write('\n')
-                sys.stdout.flush()
+            elif ch == '\x03':
+                sys.stdout.write('\n'); sys.stdout.flush()
                 raise KeyboardInterrupt
-            elif ch == '\x04':        # Ctrl+D
+            elif ch == '\x04':
                 if not buffer:
                     raise EOFError
-            elif ch in ('\r', '\n'):  # Enter
-                sys.stdout.write('\n')
-                sys.stdout.flush()
+            elif ch in ('\r', '\n'):
+                sys.stdout.write('\n'); sys.stdout.flush()
                 break
-            elif ch in ('\x7f', '\b'):  # Backspace
+            elif ch in ('\x7f', '\b'):
                 if buffer:
                     buffer.pop()
-                    sys.stdout.write('\b \b')
-                    sys.stdout.flush()
-            elif ch == '\x1b':        # Secuencia de flecha / ESC
+                    sys.stdout.write('\b \b'); sys.stdout.flush()
+            elif ch == '\x1b':
                 sys.stdin.read(2)
-            elif ch >= ' ':           # Carácter normal
+            elif ch >= ' ':
                 buffer.append(ch)
-                sys.stdout.write(ch)
-                sys.stdout.flush()
+                sys.stdout.write(ch); sys.stdout.flush()
     finally:
         try:
             termios.tcsetattr(fd, termios.TCSADRAIN, old_attrs)
         except Exception:
             pass
-
+        try:
+            os.system("stty echo 2>/dev/null")
+        except Exception:
+            pass
     if salir:
-        print(f"\n{Y}Saliendo del script...{RESET}")
+        print(f"\n\033[93m👋 Saliendo del script...\033[0m")
         try:
             log("Ctrl+X: salida manual")
         except Exception:
             pass
         sys.exit(0)
-
     return ''.join(buffer)
 
 def _input_seguro(prompt=""):
@@ -102,7 +98,6 @@ def _input_seguro(prompt=""):
     return r
 
 def _input_menu(prompt=""):
-    """Para el menú principal: solo 0/salir/exit/q cierran."""
     r = input_raw(prompt)
     if r.strip().lower() in ("0", "salir", "exit", "q"):
         raise KeyboardInterrupt
@@ -111,7 +106,7 @@ def _input_menu(prompt=""):
 builtins.input = _input_seguro
 
 # ============ CONFIG ============
-VERSION = "1.9"
+VERSION = "2.2"
 AUTOR   = "salo-9090"
 BASE    = Path.home() / "arsenal"
 LOGS    = BASE / "logs"
@@ -135,6 +130,33 @@ G="\033[92m"; R="\033[91m"; Y="\033[93m"; B="\033[94m"
 C="\033[96m"; M="\033[95m"; W="\033[97m"
 DIM="\033[2m"; BOLD="\033[1m"; RESET="\033[0m"
 
+# ============ ANCHO VISUAL (emojis = 2) ============
+def ancho_visual(texto):
+    """Calcula el ancho visual real contando emojis/CJK como 2."""
+    ancho = 0
+    for c in texto:
+        cp = ord(c)
+        if cp in (0xFE0E, 0xFE0F, 0x200D, 0x20E3):
+            continue
+        if (0x1100 <= cp <= 0x115F or 0x2E80 <= cp <= 0x303E or
+            0x3041 <= cp <= 0x33FF or 0x3400 <= cp <= 0x4DBF or
+            0x4E00 <= cp <= 0x9FFF or 0xA000 <= cp <= 0xA4CF or
+            0xAC00 <= cp <= 0xD7A3 or 0xF900 <= cp <= 0xFAFF or
+            0xFE30 <= cp <= 0xFE6B or 0xFF00 <= cp <= 0xFF60 or
+            0xFFE0 <= cp <= 0xFFE6 or 0x1F000 <= cp <= 0x1FAFF or
+            0x2600 <= cp <= 0x27BF or 0x2300 <= cp <= 0x23FF or
+            0x2190 <= cp <= 0x21FF or 0x2B00 <= cp <= 0x2BFF):
+            ancho += 2
+        else:
+            ancho += 1
+    return ancho
+
+def pad(texto, ancho_total):
+    """Rellena el texto con espacios hasta el ancho visual indicado."""
+    actual = ancho_visual(texto)
+    faltan = ancho_total - actual
+    return texto + " " * max(0, faltan)
+
 # ============ BASE DE FABRICANTES (OUI) ============
 OUI_DB = {
     "00:1a:2b": "Cisco", "00:0c:29": "VMware", "00:50:56": "VMware",
@@ -142,10 +164,10 @@ OUI_DB = {
     "f4:f2:6d": "TP-Link", "c4:e9:84": "TP-Link", "50:c7:bf": "TP-Link",
     "14:cc:20": "TP-Link", "9c:a2:f4": "TP-Link",
     "84:16:f9": "Huawei", "00:e0:fc": "Huawei", "04:bd:70": "Huawei",
-    "8c:34:fd": "Huawei", "5c:7d:5e": "Huawei",
+    "8c:34:fd": "Huawei", "5c:7d:5e": "Huawei", "d4:6e:5c": "Huawei",
     "00:1f:9f": "Sagemcom", "2c:39:96": "Sagemcom", "44:32:c8": "Sagemcom",
     "d8:47:32": "Technicolor", "38:43:7d": "Technicolor",
-    "d4:6e:5c": "Huawei", "20:0d:b0": "Arris", "84:26:15": "Arris",
+    "20:0d:b0": "Arris", "84:26:15": "Arris",
     "00:1b:63": "Apple", "00:1f:f3": "Apple", "00:23:df": "Apple",
     "3c:07:54": "Apple", "40:6c:8f": "Apple", "48:60:bc": "Apple",
     "68:a8:6d": "Apple", "88:e9:fe": "Apple", "a4:c3:61": "Apple",
@@ -186,28 +208,28 @@ def fabricante(mac):
 def tipo_por_puertos(puertos):
     p = set(puertos)
     if any(x in p for x in ["554", "8554", "34567", "37777"]):
-        return "Cámara IP"
+        return "📷 Cámara IP"
     if "9100" in p or "515" in p or "631" in p:
-        return "Impresora"
+        return "🖨  Impresora"
     if "3389" in p or ("445" in p and "135" in p):
-        return "PC Windows"
+        return "🖥  PC Windows"
     if "22" in p and "80" in p and "443" in p and "8080" in p:
-        return "Router / Server"
+        return "🌐 Router / Server"
     if "53" in p or ("80" in p and "443" in p and "22" not in p):
-        return "Router"
+        return "🌐 Router"
     if "22" in p and "80" not in p:
-        return "Linux / Server"
+        return "🐧 Linux / Server"
     if "5000" in p or "7000" in p:
-        return "Apple (AirPlay)"
+        return "🍎 Apple (AirPlay)"
     if "1900" in p or "8008" in p or "8009" in p:
-        return "Chromecast"
+        return "📺 Chromecast"
     if "5353" in p:
-        return "Dispositivo mDNS"
+        return "📡 Dispositivo mDNS"
     if "8080" in p or "8081" in p or "8443" in p:
-        return "Panel web / IoT"
+        return "⚙  Panel web / IoT"
     if "80" in p or "443" in p:
-        return "Dispositivo web"
-    return "Desconocido"
+        return "🌐 Dispositivo web"
+    return "❓ Desconocido"
 
 def obtener_mac(ip):
     salida = run(["ip", "neigh", "show", ip], timeout=10)
@@ -232,10 +254,8 @@ def identificar_dispositivo(ip):
     for linea in r.splitlines():
         if "/tcp" in linea and "open" in linea:
             abiertos.append(linea.split("/")[0].strip())
-    return {
-        "ip": ip, "mac": mac, "fabricante": fab,
-        "tipo": tipo_por_puertos(abiertos), "puertos": abiertos
-    }
+    return {"ip": ip, "mac": mac, "fabricante": fab,
+            "tipo": tipo_por_puertos(abiertos), "puertos": abiertos}
 
 # ============ UTILIDADES ============
 def log(msg, level="info"):
@@ -246,32 +266,41 @@ def clear():
 
 def pausa():
     try:
-        input_raw(f"\n{DIM}Presioná ENTER para volver al menú...{RESET}")
+        input_raw(f"\n  {DIM}⌨  Presioná ENTER para volver al menú...{RESET}")
     except (KeyboardInterrupt, EOFError):
         pass
 
-def banner(titulo=""):
+def banner(titulo="", icono="🛡"):
     clear()
-    print(f"{C}{'='*55}{RESET}")
-    print(f"{BOLD}{W}   ARSENAL DE AUDITORÍA  {DIM}v{VERSION}{RESET}")
-    print(f"{C}{'='*55}{RESET}")
+    ancho = 56
+    print(f"{C}╔{'═'*ancho}╗{RESET}")
+    linea1 = f"{icono}  A R S E N A L   D E   A U D I T O R Í A"
+    print(f"{C}║{RESET} {BOLD}{W}{pad(linea1, ancho-1)}{RESET}{C}║{RESET}")
+    linea2 = f"v{VERSION}  ·  by {AUTOR}  ·  Termux"
+    print(f"{C}║{RESET} {DIM}{pad(linea2, ancho-1)}{RESET}{C}║{RESET}")
     if titulo:
-        print(f"{M}  >> {titulo}{RESET}")
-        print(f"{C}{'-'*55}{RESET}")
+        print(f"{C}╠{'═'*ancho}╣{RESET}")
+        print(f"{C}║{RESET} {M}{BOLD}{pad(titulo, ancho-1)}{RESET}{C}║{RESET}")
+    print(f"{C}╚{'═'*ancho}╝{RESET}")
 
 def menu_opciones(opciones):
-    ancho = shutil.get_terminal_size((45, 20)).columns
-    max_nombre = max((len(n) for _, n, _ in opciones if n), default=0)
-    lado_a_lado = ancho >= 65 and (max_nombre + 22) < ancho
-    for num, nombre, desc in opciones:
+    ancho = shutil.get_terminal_size((50, 20)).columns
+    lado_a_lado = ancho >= 70
+    max_nombre = max((ancho_visual(n) for _, _, n, _ in opciones), default=0)
+
+    for num, icono, nombre, desc in opciones:
+        prefijo = f"[{num}]"
+        icono_txt = f" {icono} " if icono else " "
+        nombre_pad = pad(nombre, max_nombre)
+
         if lado_a_lado and desc:
-            print(f"  {C}[{num}]{RESET} {nombre:<{max_nombre}} {DIM}-> {desc}{RESET}")
+            print(f"  {C}{prefijo}{RESET}{icono_txt}{nombre_pad}  {DIM}→ {desc}{RESET}")
         elif lado_a_lado:
-            print(f"  {C}[{num}]{RESET} {nombre}")
+            print(f"  {C}{prefijo}{RESET}{icono_txt}{nombre}")
         else:
-            print(f"  {C}[{num}]{RESET} {nombre}")
+            print(f"  {C}{prefijo}{RESET}{icono_txt}{nombre}")
             if desc:
-                print(f"      {DIM}-> {desc}{RESET}")
+                print(f"       {DIM}→ {desc}{RESET}")
 
 def check_tool(name):
     return shutil.which(name) is not None
@@ -310,19 +339,19 @@ def detectar_red_actual():
 def pedir_ip():
     net = detectar_red_actual()
     if net:
-        print(f"{DIM}Red detectada: {net['red']}  (router: {net['router']}){RESET}")
-        print(f"{DIM}ENTER = red actual | 'router' = gateway | o escribí otra{RESET}")
-        print(f"{DIM}Escape: 0, atras, volver, b, q | Ctrl+X = salir{RESET}")
+        print(f"  {DIM}🌐 Red: {net['red']}  ·  Router: {net['router']}{RESET}")
+        print(f"  {DIM}ENTER = red actual  ·  'router' = gateway  ·  otra IP{RESET}")
+        print(f"  {DIM}Escape: 0, atras, volver, b, q  ·  Ctrl+X salir{RESET}")
     while True:
-        s = input(f"{C}IP / rango: {RESET}").strip()
+        s = input(f"  {C}▶ IP / rango: {RESET}").strip()
         if not s and net:
             return net["red"]
         if s.lower() in ("local", "wifi", "mi red"):
             if net: return net["red"]
-            print(f"{R}[!] No pude detectar la red local.{RESET}"); continue
+            print(f"  {R}[!] No pude detectar la red.{RESET}"); continue
         if s.lower() in ("router", "gw", "gateway"):
             if net: return net["router"]
-            print(f"{R}[!] No pude detectar el router.{RESET}"); continue
+            print(f"  {R}[!] No pude detectar el router.{RESET}"); continue
         try:
             if "/" in s:
                 ipaddress.ip_network(s, strict=False)
@@ -330,20 +359,17 @@ def pedir_ip():
                 ipaddress.ip_address(s)
             return s
         except ValueError:
-            print(f"{R}[!] Formato inválido.{RESET}")
-            print(f"{DIM}  IP: 192.168.0.50 | Rango: 192.168.0.0/24 | ENTER | router{RESET}")
+            print(f"  {R}[!] Formato inválido.{RESET}")
+            print(f"  {DIM}  IP: 192.168.0.50 | Rango: 192.168.0.0/24 | ENTER | router{RESET}")
 
 def pedir_puertos():
-    print(f"{DIM}Presets: comunes | web | camaras | todos | o puertos a mano{RESET}")
-    s = input(f"{C}Puertos (ENTER = comunes): {RESET}").strip().lower()
+    print(f"  {DIM}Presets: comunes | web | camaras | todos | a mano{RESET}")
+    s = input(f"  {C}▶ Puertos (ENTER = comunes): {RESET}").strip().lower()
     if s == "" or s == "comunes":
         return "21,22,23,25,53,80,110,139,143,443,445,993,995,3306,3389,5432,8080"
-    if s == "web":
-        return "80,443,8000,8080,8081,8443,8888"
-    if s == "camaras":
-        return "80,443,554,8000,8080,8554,34567,37777"
-    if s == "todos":
-        return "1-65535"
+    if s == "web": return "80,443,8000,8080,8081,8443,8888"
+    if s == "camaras": return "80,443,554,8000,8080,8554,34567,37777"
+    if s == "todos": return "1-65535"
     return s
 
 def guardar(nombre, contenido):
@@ -356,7 +382,7 @@ def guardar(nombre, contenido):
 def run(cmd, guardar_como=None, timeout=300, cwd=None):
     log(f"CMD: {' '.join(cmd)}")
     if not check_tool(cmd[0]):
-        msg = f"[!] '{cmd[0]}' no está instalado. Instalalo con: pkg install {cmd[0]}"
+        msg = f"[!] '{cmd[0]}' no está instalado. pkg install {cmd[0]}"
         log(msg, "warning")
         return msg
     try:
@@ -371,50 +397,51 @@ def run(cmd, guardar_como=None, timeout=300, cwd=None):
         log(f"Error: {e}", "error"); return f"[!] Error: {e}"
 
 def pedir_confirmacion(msg):
-    r = input(f"{Y}{msg} (s/n): {RESET}").strip().lower()
+    r = input(f"  {Y}❓ {msg} (s/n): {RESET}").strip().lower()
     return r == "s"
 
 # ============ AVISO DE AUTORIZACIÓN ============
 def aviso_autorizacion():
     clear()
+    ancho = 56
     print(f"{R}{BOLD}")
-    print("  ╔══════════════════════════════════════════════════╗")
-    print("  ║   AVISO DE USO RESPONSABLE                       ║")
-    print("  ╠══════════════════════════════════════════════════╣")
-    print("  ║  Esta herramienta es para auditoría en redes     ║")
-    print("  ║  PROPIAS o con AUTORIZACIÓN POR ESCRITO.         ║")
-    print("  ║  Usarla contra redes ajenas es DELITO.           ║")
-    print("  ║  (Ley 26.388 art. 153 bis - Argentina)           ║")
-    print("  ╚══════════════════════════════════════════════════╝")
+    print(f"  ╔{'═'*ancho}╗")
+    print(f"  ║{pad('  ⚠   AVISO DE USO RESPONSABLE', ancho)}║")
+    print(f"  ╠{'═'*ancho}╣")
+    print(f"  ║{pad('  Esta herramienta es para auditoría en redes', ancho)}║")
+    print(f"  ║{pad('  PROPIAS o con AUTORIZACIÓN POR ESCRITO.', ancho)}║")
+    print(f"  ║{pad('  Usarla contra redes ajenas es DELITO.', ancho)}║")
+    print(f"  ║{pad('  (Ley 26.388 art. 153 bis - Argentina)', ancho)}║")
+    print(f"  ╚{'═'*ancho}╝")
     print(f"{RESET}")
-    log("Aviso de autorización mostrado.")
-    r = input_raw(f"{C}¿Tenés autorización? (s/n, Ctrl+X para salir): {RESET}").strip().lower()
+    log("Aviso mostrado.")
+    r = input_raw(f"  {C}▶ ¿Tenés autorización? (s/n, Ctrl+X salir): {RESET}").strip().lower()
     if r != "s":
-        print(f"{R}Cerrando. Usá esto solo con permiso.{RESET}")
-        log("Usuario rechazó autorización. Saliendo.", "warning")
+        print(f"\n  {R}Cerrando. Usá esto solo con permiso.{RESET}")
+        log("Usuario rechazó autorización.", "warning")
         sys.exit(0)
-    scope = input_raw(f"{C}Describí brevemente el scope: {RESET}").strip()
-    log(f"Scope declarado: {scope}")
+    scope = input_raw(f"  {C}▶ Describí el scope: {RESET}").strip()
+    log(f"Scope: {scope}")
     (CONF / f"scope_{SESSION}.txt").write_text(
         f"Sesión: {SESSION}\nScope: {scope}\nAutorizado: sí\n", encoding="utf-8")
 
 # ============ SUBMENÚ: ESCANEO ============
 def menu_escaneo():
     opciones = [
-        ("1", "Ping a un host", "Ver si responde"),
-        ("2", "Nmap rápido", "Top 100 puertos"),
-        ("3", "Nmap con presets", "comunes/web/camaras/todos"),
-        ("4", "Nmap -sV", "Detectar versiones"),
-        ("5", "Descubrir e identificar", "Hosts + fabricante + tipo"),
-        ("6", "Análisis ARP", "IP a MAC"),
-        ("7", "Escaneo completo (-p-)", "65535 puertos (lento)"),
-        ("0", "Volver (o 'atras','b','q')", ""),
+        ("1", "📡", "Ping a un host", "Ver si responde"),
+        ("2", "⚡", "Nmap rápido", "Top 100 puertos"),
+        ("3", "🎯", "Nmap con presets", "comunes/web/camaras/todos"),
+        ("4", "🔎", "Nmap -sV", "Detectar versiones"),
+        ("5", "🗺", "Descubrir e identificar", "Hosts + fabricante + tipo"),
+        ("6", "📋", "Análisis ARP", "IP a MAC"),
+        ("7", "🐢", "Escaneo completo (-p-)", "65535 puertos (lento)"),
+        ("0", "↩", "Volver", "atras / b / q"),
     ]
     while True:
-        banner("ESCANEO DE RED")
+        banner("🔍  ESCANEO DE RED")
         menu_opciones(opciones)
-        print(f"{DIM}Ctrl+X para salir del script{RESET}")
-        op = input(f"\n{C}Opción: {RESET}").strip()
+        print(f"  {DIM}💡 Ctrl+X sale del script  ·  Ctrl+C vuelve{RESET}")
+        op = input(f"\n  {C}▶ Opción: {RESET}").strip()
         if es_volver(op): return
         elif op == "1":
             ip = pedir_ip()
@@ -424,7 +451,8 @@ def menu_escaneo():
             print(run(["nmap", "-F", ip], f"nmap_fast_{ip}_{SESSION}.txt"))
         elif op == "3":
             ip = pedir_ip(); puertos = pedir_puertos()
-            print(run(["nmap", "-sV", "-p", puertos, ip], f"nmap_custom_{ip}_{SESSION}.txt", timeout=900))
+            print(run(["nmap", "-sV", "-p", puertos, ip],
+                      f"nmap_custom_{ip}_{SESSION}.txt", timeout=900))
         elif op == "4":
             ip = pedir_ip()
             print(run(["nmap", "-sV", ip], f"nmap_sv_{ip}_{SESSION}.txt", timeout=900))
@@ -434,17 +462,17 @@ def menu_escaneo():
             print(run(["arp", "-a"], f"arp_{SESSION}.txt"))
         elif op == "7":
             ip = pedir_ip()
-            if pedir_confirmacion("Escaneo de TODOS los puertos (tarda mucho). ¿Continuar?"):
+            if pedir_confirmacion("Escaneo de TODOS los puertos (tarda mucho)"):
                 print(run(["nmap", "-p-", ip], f"nmap_full_{ip}_{SESSION}.txt", timeout=1800))
         else:
-            print(f"{R}Opción inválida.{RESET}"); continue
+            print(f"  {R}[!] Opción inválida.{RESET}"); continue
         pausa()
 
 def escanear_e_identificar():
     net = detectar_red_actual()
-    red = net["red"] if net else input(f"{C}Rango (ej 192.168.0.0/24): {RESET}").strip()
-    print(f"\n{DIM}Red objetivo: {red}{RESET}")
-    print(f"{DIM}[1/2] Descubriendo hosts activos...{RESET}")
+    red = net["red"] if net else input(f"  {C}▶ Rango: {RESET}").strip()
+    print(f"\n  {DIM}🎯 Red objetivo: {red}{RESET}")
+    print(f"  {DIM}[1/2] 🔍 Descubriendo hosts...{RESET}")
     out = run(["nmap", "-sn", red], timeout=300)
     ips = []
     for linea in out.splitlines():
@@ -452,25 +480,29 @@ def escanear_e_identificar():
             ip = linea.split("(")[-1].split(")")[0] if "(" in linea else linea.split()[-1]
             ips.append(ip)
     if not ips:
-        print(f"{R}[!] No se encontraron hosts.{RESET}"); return
-    print(f"{G}[+] {len(ips)} hosts encontrados.{RESET}\n")
-    print(f"{DIM}[2/2] Identificando cada dispositivo...{RESET}\n")
+        print(f"  {R}[!] No se encontraron hosts.{RESET}"); return
+    print(f"  {G}[✓] {len(ips)} hosts activos.{RESET}\n")
+    print(f"  {DIM}[2/2] 🔬 Identificando dispositivos...{RESET}\n")
     resultados = []
     for i, ip in enumerate(ips, 1):
-        print(f"{DIM}[{i}/{len(ips)}] Analizando {ip}...{RESET}")
+        print(f"  {DIM}[{i}/{len(ips)}] {ip}{RESET}")
         resultados.append(identificar_dispositivo(ip))
-    print(f"\n{C}{'='*55}{RESET}")
-    print(f"{BOLD}{W}  DISPOSITIVOS EN LA RED {red}{RESET}")
-    print(f"{C}{'='*55}{RESET}\n")
+    print()
+    banner("📋  INVENTARIO DE RED")
     for d in resultados:
-        marca = f"{Y} [ROUTER]{RESET}" if net and d["ip"] == net["router"] else ""
-        color = G if d["tipo"] != "Desconocido" else Y
-        print(f"{BOLD}{d['ip']}{RESET}{marca}")
-        print(f"  MAC:         {d['mac']}")
-        print(f"  Fabricante:  {d['fabricante']}")
-        print(f"  Tipo:        {color}{d['tipo']}{RESET}")
+        es_router = net and d["ip"] == net["router"]
+        etiq_vis = " [ROUTER]" if es_router else ""
+        header = f"┌─ {d['ip']}{etiq_vis} "
+        vis = ancho_visual(header)
+        relleno = max(0, 50 - vis)
+        color = G if "Desconocido" not in d["tipo"] else Y
+        print(f"  {header}{'─'*relleno}")
+        print(f"  │  {DIM}MAC:{RESET}         {d['mac']}")
+        print(f"  │  {DIM}Fabricante:{RESET}  {d['fabricante']}")
+        print(f"  │  {DIM}Tipo:{RESET}        {color}{d['tipo']}{RESET}")
         if d["puertos"]:
-            print(f"  Puertos:     {', '.join(d['puertos'])}")
+            print(f"  │  {DIM}Puertos:{RESET}     {', '.join(d['puertos'])}")
+        print(f"  └{'─'*49}")
         print()
     rep = [f"# Inventario de red - {datetime.now():%Y-%m-%d %H:%M}", "",
            f"Red: {red}", f"Hosts: {len(resultados)}", "",
@@ -479,135 +511,129 @@ def escanear_e_identificar():
     for d in resultados:
         rep.append(f"| {d['ip']} | {d['mac']} | {d['fabricante']} | {d['tipo']} | {', '.join(d['puertos'])} |")
     p = guardar(f"inventario_{SESSION}.md", "\n".join(rep))
-    print(f"{G}[+] Inventario: {p}{RESET}")
+    print(f"  {G}[✓] Inventario: {p}{RESET}")
     log(f"Inventario: {len(resultados)} hosts")
 
 # ============ SUBMENÚ: WEB ============
 def menu_web():
     opciones = [
-        ("1", "Headers HTTP", "Servidor y respuesta"),
-        ("2", "Certificado SSL/TLS", "Ver si expiró, emisor"),
-        ("3", "Whois", "Dueño y registro"),
-        ("4", "DNS", "Resolver dominio"),
-        ("5", "Traceroute", "Camino hasta el host"),
-        ("0", "Volver (o 'atras','b','q')", ""),
+        ("1", "📄", "Headers HTTP", "Servidor y respuesta"),
+        ("2", "🔒", "Certificado SSL/TLS", "Ver si expiró, emisor"),
+        ("3", "🌍", "Whois", "Dueño y registro"),
+        ("4", "📡", "DNS", "Resolver dominio"),
+        ("5", "🛤", "Traceroute", "Camino hasta el host"),
+        ("0", "↩", "Volver", "atras / b / q"),
     ]
     while True:
-        banner("ANÁLISIS WEB / SSL")
+        banner("🌐  ANÁLISIS WEB / SSL")
         menu_opciones(opciones)
-        op = input(f"\n{C}Opción: {RESET}").strip()
+        op = input(f"\n  {C}▶ Opción: {RESET}").strip()
         if es_volver(op): return
         elif op == "1":
-            url = input(f"{C}URL: {RESET}").strip()
+            url = input(f"  {C}▶ URL: {RESET}").strip()
             print(run(["curl", "-s", "-I", url], f"headers_{SESSION}.txt"))
         elif op == "2":
-            host = input(f"{C}Host: {RESET}").strip()
+            host = input(f"  {C}▶ Host: {RESET}").strip()
             print(run(["openssl", "s_client", "-connect", f"{host}:443", "-servername", host],
                       f"ssl_{host}_{SESSION}.txt", timeout=30))
         elif op == "3":
-            obj = input(f"{C}Dominio o IP: {RESET}").strip()
+            obj = input(f"  {C}▶ Dominio o IP: {RESET}").strip()
             print(run(["whois", obj], f"whois_{obj}_{SESSION}.txt"))
         elif op == "4":
-            obj = input(f"{C}Dominio: {RESET}").strip()
-            if check_tool("dig"):
-                print(run(["dig", obj], f"dns_{obj}_{SESSION}.txt"))
-            else:
-                print(run(["nslookup", obj], f"dns_{obj}_{SESSION}.txt"))
+            obj = input(f"  {C}▶ Dominio: {RESET}").strip()
+            print(run(["dig", obj] if check_tool("dig") else ["nslookup", obj],
+                      f"dns_{obj}_{SESSION}.txt"))
         elif op == "5":
-            obj = input(f"{C}Host/IP: {RESET}").strip()
+            obj = input(f"  {C}▶ Host/IP: {RESET}").strip()
             print(run(["traceroute", obj], f"traceroute_{obj}_{SESSION}.txt"))
         else:
-            print(f"{R}Opción inválida.{RESET}"); continue
+            print(f"  {R}[!] Opción inválida.{RESET}"); continue
         pausa()
 
 # ============ SUBMENÚ: CRIPTO ============
 def menu_cripto():
     opciones = [
-        ("1", "MD5 de archivo", "Hash rápido (obsoleto)"),
-        ("2", "SHA256 de archivo", "Hash recomendado"),
-        ("3", "Verificar hash", "Comparar con esperado"),
-        ("4", "Hash de texto", "MD5 y SHA256 de texto"),
-        ("0", "Volver (o 'atras','b','q')", ""),
+        ("1", "🔐", "MD5 de archivo", "Rápido (obsoleto)"),
+        ("2", "🔐", "SHA256 de archivo", "Recomendado"),
+        ("3", "✅", "Verificar hash", "Comparar con esperado"),
+        ("4", "📝", "Hash de texto", "MD5 y SHA256"),
+        ("0", "↩", "Volver", "atras / b / q"),
     ]
     while True:
-        banner("CRIPTOGRAFÍA / INTEGRIDAD")
+        banner("🔐  CRIPTOGRAFÍA / INTEGRIDAD")
         menu_opciones(opciones)
-        op = input(f"\n{C}Opción: {RESET}").strip()
+        op = input(f"\n  {C}▶ Opción: {RESET}").strip()
         if es_volver(op): return
         elif op == "1":
-            f = input(f"{C}Ruta: {RESET}").strip()
+            f = input(f"  {C}▶ Ruta: {RESET}").strip()
             print(run(["md5sum", f], f"md5_{SESSION}.txt"))
         elif op == "2":
-            f = input(f"{C}Ruta: {RESET}").strip()
+            f = input(f"  {C}▶ Ruta: {RESET}").strip()
             print(run(["sha256sum", f], f"sha256_{SESSION}.txt"))
         elif op == "3":
-            f = input(f"{C}Ruta del binario: {RESET}").strip()
-            h = input(f"{C}Hash esperado: {RESET}").strip().lower()
+            f = input(f"  {C}▶ Ruta binario: {RESET}").strip()
+            h = input(f"  {C}▶ Hash esperado: {RESET}").strip().lower()
             out = run(["sha256sum", f])
             real = out.split()[0] if out and " " in out else ""
-            print(f"{G}OK{RESET}" if real == h else f"{R}NO COINCIDE{RESET}")
+            print(f"  {G}[✓] OK{RESET}" if real == h else f"  {R}[✗] NO COINCIDE{RESET}")
         elif op == "4":
-            txt = input(f"{C}Texto: {RESET}").strip()
-            print(f"MD5:    {hashlib.md5(txt.encode()).hexdigest()}")
-            print(f"SHA256: {hashlib.sha256(txt.encode()).hexdigest()}")
+            txt = input(f"  {C}▶ Texto: {RESET}").strip()
+            print(f"  MD5:    {G}{hashlib.md5(txt.encode()).hexdigest()}{RESET}")
+            print(f"  SHA256: {G}{hashlib.sha256(txt.encode()).hexdigest()}{RESET}")
         else:
-            print(f"{R}Opción inválida.{RESET}"); continue
+            print(f"  {R}[!] Opción inválida.{RESET}"); continue
         pausa()
 
 # ============ SUBMENÚ: RTSP ============
 def menu_rtsp():
-    banner("MONITOREO RTSP (cámaras IP)")
-    print(f"{Y}[!] Solo cámaras propias o con autorización.{RESET}\n")
+    banner("📡  MONITOREO RTSP")
+    print(f"  {Y}[!] Solo cámaras propias o con autorización.{RESET}\n")
     ip = pedir_ip()
-    print(f"\n{DIM}Verificando puerto 554...{RESET}\n")
+    print(f"\n  {DIM}Verificando puerto 554...{RESET}\n")
     out = run(["nc", "-z", "-w", "2", ip, "554"], timeout=10)
     if "succeeded" in out.lower() or "open" in out.lower():
-        print(f"{G}[+] Puerto 554 abierto.{RESET}")
+        print(f"  {G}[✓] Puerto 554 abierto.{RESET}")
     else:
-        print(f"{Y}[i] Puerto 554 cerrado o filtrado.{RESET}")
-    guardar(f"rtsp_{ip}_{SESSION}.txt", f"RTSP check {ip}\nPuerto 554 -> {out}\n")
+        print(f"  {Y}[i] Puerto 554 cerrado o filtrado.{RESET}")
+    guardar(f"rtsp_{ip}_{SESSION}.txt", f"RTSP {ip}\n554 -> {out}\n")
     pausa()
 
 # ============ SUBMENÚ: SOCKETS ============
 def menu_sockets():
     opciones = [
-        ("1", "Escuchar en puerto", "Recibir conexiones"),
-        ("2", "Conectar a host", "Probar puerto abierto"),
-        ("3", "Puertos en escucha", "Servicios locales"),
-        ("0", "Volver (o 'atras','b','q')", ""),
+        ("1", "🎧", "Escuchar en puerto", "Recibir conexiones"),
+        ("2", "🔌", "Conectar a host", "Probar puerto"),
+        ("3", "📊", "Puertos en escucha", "Servicios locales"),
+        ("0", "↩", "Volver", "atras / b / q"),
     ]
     while True:
-        banner("SOCKETS / NETCAT")
+        banner("🔌  SOCKETS / NETCAT")
         menu_opciones(opciones)
-        op = input(f"\n{C}Opción: {RESET}").strip()
+        op = input(f"\n  {C}▶ Opción: {RESET}").strip()
         if es_volver(op): return
         elif op == "1":
-            p = input(f"{C}Puerto: {RESET}").strip()
-            if pedir_confirmacion("¿Tenés autorización?"):
+            p = input(f"  {C}▶ Puerto: {RESET}").strip()
+            if pedir_confirmacion("¿Autorización para recibir conexiones?"):
                 print(run(["nc", "-lvp", p], f"nc_listen_{p}_{SESSION}.txt"))
         elif op == "2":
-            ip = pedir_ip(); p = input(f"{C}Puerto: {RESET}").strip()
+            ip = pedir_ip(); p = input(f"  {C}▶ Puerto: {RESET}").strip()
             print(run(["nc", "-zv", ip, p], f"nc_{ip}_{p}_{SESSION}.txt", timeout=10))
         elif op == "3":
-            if check_tool("ss"):
-                print(run(["ss", "-tuln"], f"sockets_{SESSION}.txt"))
-            else:
-                print(run(["netstat", "-tuln"], f"sockets_{SESSION}.txt"))
+            cmd = ["ss", "-tuln"] if check_tool("ss") else ["netstat", "-tuln"]
+            print(run(cmd, f"sockets_{SESSION}.txt"))
         else:
-            print(f"{R}Opción inválida.{RESET}"); continue
+            print(f"  {R}[!] Opción inválida.{RESET}"); continue
         pausa()
 
 # ============ SUBMENÚ: WIFI ============
 def menu_wifi():
-    banner("AUDITORÍA WI-FI")
-    print(f"{Y}[!] En Termux sin root solo info de interfaces.{RESET}\n")
+    banner("📶  AUDITORÍA WI-FI")
+    print(f"  {Y}[!] Sin root solo info de interfaces.{RESET}\n")
     salida = ""
     if check_tool("termux-wifi-connectioninfo"):
         salida += run(["termux-wifi-connectioninfo"]) + "\n"
-    if check_tool("ifconfig"):
-        salida += run(["ifconfig"])
-    elif check_tool("ip"):
-        salida += run(["ip", "addr"])
+    if check_tool("ifconfig"): salida += run(["ifconfig"])
+    elif check_tool("ip"): salida += run(["ip", "addr"])
     print(salida)
     guardar(f"wifi_{SESSION}.txt", salida)
     pausa()
@@ -615,24 +641,23 @@ def menu_wifi():
 # ============ SUBMENÚ: WORDLISTS ============
 def menu_wordlists():
     opciones = [
-        ("1", "Listar wordlists", "Ver diccionarios"),
-        ("2", "Crear wordlist", "Generar combinaciones"),
-        ("0", "Volver (o 'atras','b','q')", ""),
+        ("1", "📚", "Listar wordlists", "Ver diccionarios"),
+        ("2", "✏", "Crear wordlist", "Generar combinaciones"),
+        ("0", "↩", "Volver", "atras / b / q"),
     ]
     while True:
-        banner("GESTIÓN DE WORDLISTS")
+        banner("📖  GESTIÓN DE WORDLISTS")
         menu_opciones(opciones)
-        op = input(f"\n{C}Opción: {RESET}").strip()
+        op = input(f"\n  {C}▶ Opción: {RESET}").strip()
         wl_dir = BASE / "wordlists"; wl_dir.mkdir(exist_ok=True)
         if es_volver(op): return
         elif op == "1":
             archivos = list(wl_dir.iterdir())
-            if not archivos: print(f"{DIM}No hay wordlists.{RESET}")
-            for f in archivos: print(f"  - {f.name}")
+            if not archivos: print(f"  {DIM}No hay wordlists.{RESET}")
+            for f in archivos: print(f"  📄 {f.name}")
         elif op == "2":
-            print(f"{Y}[!] Uso solo en labs autorizados.{RESET}")
-            base = input(f"{C}Palabra base: {RESET}").strip()
-            anio = input(f"{C}Año: {RESET}").strip()
+            base = input(f"  {C}▶ Palabra base: {RESET}").strip()
+            anio = input(f"  {C}▶ Año: {RESET}").strip()
             salida = []
             for s in ["", "123", "1234", "!", "@", "2024", "2025"]:
                 salida.append(f"{base}{s}"); salida.append(f"{base.capitalize()}{s}")
@@ -641,25 +666,26 @@ def menu_wordlists():
                     salida.append(f"{base}{s}")
             p = wl_dir / f"wl_{base}_{SESSION}.txt"
             p.write_text("\n".join(salida), encoding="utf-8")
-            print(f"{G}[+] Guardada ({len(salida)} entradas){RESET}")
+            print(f"  {G}[✓] Guardada ({len(salida)} entradas){RESET}")
         else:
-            print(f"{R}Opción inválida.{RESET}"); continue
+            print(f"  {R}[!] Opción inválida.{RESET}"); continue
         pausa()
 
 # ============ SUBMENÚ: IA ============
 def menu_ia():
-    banner("CHAT IA")
+    banner("🤖  CHAT IA")
     key_file = CONF / "ia_api_key.txt"
     if not key_file.exists():
-        print(f"{Y}No hay API key.{RESET}")
-        print(f"{DIM}Groq free: console.groq.com{RESET}")
-        key = input(f"{C}API key: {RESET}").strip()
+        print(f"  {Y}No hay API key.{RESET}")
+        print(f"  {DIM}Groq free: console.groq.com{RESET}")
+        key = input(f"  {C}▶ API key: {RESET}").strip()
         if not key: pausa(); return
         key_file.write_text(key, encoding="utf-8")
         os.chmod(key_file, 0o600)
     key = key_file.read_text(encoding="utf-8").strip()
     modelo = "openai/gpt-oss-20b"
-    print(f"{DIM}Modelo: {modelo} | 'salir' o 'volver' para regresar | Ctrl+X sale{RESET}\n")
+    print(f"  {DIM}Modelo: {modelo}{RESET}")
+    print(f"  {DIM}'salir' o 'volver' para regresar  ·  Ctrl+X sale{RESET}\n")
     historial = [{
         "role": "system",
         "content": ("Sos un asistente de ciberseguridad para un laboratorio autorizado. "
@@ -668,7 +694,7 @@ def menu_ia():
     }]
     while True:
         try:
-            pregunta = input(f"{C}Vos> {RESET}").strip()
+            pregunta = input(f"  {M}🗣  Vos>{RESET} ").strip()
         except (EOFError, KeyboardInterrupt):
             break
         if pregunta.lower() in ("salir", "exit", "quit", ""):
@@ -682,111 +708,116 @@ def menu_ia():
         try:
             res = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
             if not res.stdout.strip():
-                print(f"{R}[!] Sin respuesta.{RESET}"); historial.pop(); continue
+                print(f"  {R}[!] Sin respuesta.{RESET}"); historial.pop(); continue
             data = json.loads(res.stdout)
             if "error" in data:
-                print(f"{R}[!] Error: {data['error'].get('message','?')}{RESET}")
+                print(f"  {R}[!] Error: {data['error'].get('message','?')}{RESET}")
                 historial.pop(); continue
             if "choices" not in data:
-                print(f"{R}[!] Respuesta inesperada.{RESET}"); historial.pop(); continue
+                print(f"  {R}[!] Respuesta inesperada.{RESET}"); historial.pop(); continue
             respuesta = data["choices"][0]["message"]["content"]
             historial.append({"role": "assistant", "content": respuesta})
-            print(f"\n{G}IA>{RESET} {respuesta}\n")
+            print(f"\n  {G}🤖 IA>{RESET} {respuesta}\n")
         except subprocess.TimeoutExpired:
-            print(f"{R}[!] Timeout.{RESET}"); historial.pop()
+            print(f"  {R}[!] Timeout.{RESET}"); historial.pop()
         except Exception as e:
-            print(f"{R}[!] Error: {e}{RESET}"); historial.pop()
+            print(f"  {R}[!] Error: {e}{RESET}"); historial.pop()
 
 # ============ SUBMENÚ: GITHUB ============
 def menu_github():
     TOKEN_FILE = CONF / "github_token.txt"
     URL_FILE   = CONF / "github_url.txt"
+    run(["git", "config", "--global", "credential.helper", "store"])
     opciones = [
-        ("1", "Configurar repo", "URL + token"),
-        ("2", "Inicializar repo", "Primera vez"),
-        ("3", "Ver estado", "git status"),
-        ("4", "Subir cambios", "commit + push"),
-        ("5", "Bajar cambios", "pull + actualizar"),
-        ("6", "Historial de commits", "Últimos 20"),
-        ("7", "Clonar repo", "Bajar de GitHub"),
-        ("0", "Volver (o 'atras','b','q')", ""),
+        ("1", "⚙", "Configurar repo", "URL + token"),
+        ("2", "🚀", "Inicializar repo", "Primera vez"),
+        ("3", "📊", "Ver estado", "git status"),
+        ("4", "⬆", "Subir cambios", "commit + push"),
+        ("5", "⬇", "Bajar cambios", "pull + actualizar"),
+        ("6", "📜", "Historial", "Últimos 20 commits"),
+        ("7", "📥", "Clonar repo", "Bajar de GitHub"),
+        ("0", "↩", "Volver", "atras / b / q"),
     ]
     while True:
-        banner("SINCRONIZACIÓN CON GITHUB")
+        banner("☁   SINCRONIZACIÓN GITHUB")
         menu_opciones(opciones)
-        op = input(f"\n{C}Opción: {RESET}").strip()
+        op = input(f"\n  {C}▶ Opción: {RESET}").strip()
         if es_volver(op): return
         elif op == "1":
-            print(f"{DIM}Ej URL: https://github.com/tuuser/arsenal.git{RESET}")
-            url = input(f"{C}URL: {RESET}").strip()
-            print(f"{DIM}Token: github.com/settings/tokens -> scope 'repo'{RESET}")
-            token = input(f"{C}Token (ENTER = mantener): {RESET}").strip()
+            url = input(f"  {C}▶ URL: {RESET}").strip()
+            token = input(f"  {C}▶ Token (ENTER = mantener): {RESET}").strip()
             if url: URL_FILE.write_text(url, encoding="utf-8")
             if token:
                 TOKEN_FILE.write_text(token, encoding="utf-8")
                 os.chmod(TOKEN_FILE, 0o600)
-            print(f"{G}[+] Guardado.{RESET}")
+            print(f"  {G}[✓] Guardado.{RESET}")
         elif op == "2":
             if not URL_FILE.exists():
-                print(f"{R}[!] Configurá el repo primero.{RESET}"); pausa(); continue
-            src = Path(__file__).resolve()
-            shutil.copy(src, REPO / "arsenal.py")
+                print(f"  {R}[!] Configurá el repo primero.{RESET}"); pausa(); continue
+            shutil.copy(Path(__file__).resolve(), REPO / "arsenal.py")
             if not (REPO / ".git").exists():
                 run(["git", "init"], cwd=str(REPO))
                 run(["git", "branch", "-M", "main"], cwd=str(REPO))
-            print(f"{G}[+] Repo inicializado.{RESET}")
+            print(f"  {G}[✓] Repo inicializado.{RESET}")
         elif op == "3":
             print(run(["git", "status"], cwd=str(REPO)))
         elif op == "4":
             if not TOKEN_FILE.exists() or not URL_FILE.exists():
-                print(f"{R}[!] Configurá el repo primero.{RESET}"); pausa(); continue
+                print(f"  {R}[!] Configurá el repo primero.{RESET}"); pausa(); continue
             if not (REPO / ".git").exists():
-                print(f"{R}[!] Inicializá el repo primero.{RESET}"); pausa(); continue
-            src = Path(__file__).resolve()
-            shutil.copy(src, REPO / "arsenal.py")
-            msg = input(f"{C}Mensaje: {RESET}").strip() or f"update {datetime.now():%Y-%m-%d %H:%M}"
+                print(f"  {R}[!] Inicializá el repo primero.{RESET}"); pausa(); continue
+            shutil.copy(Path(__file__).resolve(), REPO / "arsenal.py")
+            msg = input(f"  {C}▶ Mensaje: {RESET}").strip() or f"update {datetime.now():%Y-%m-%d %H:%M}"
             url = URL_FILE.read_text().strip()
             token = TOKEN_FILE.read_text().strip()
-            auth_url = url.replace("https://", f"https://{token}@", 1) if url.startswith("https://") and token else url
+            if url.startswith("https://") and token and "github.com/" in url:
+                user = url.split("github.com/")[1].split("/")[0]
+                cred_file = Path.home() / ".git-credentials"
+                linea = f"https://{user}:{token}@github.com\n"
+                existente = cred_file.read_text(encoding="utf-8") if cred_file.exists() else ""
+                if token not in existente:
+                    with open(cred_file, "a", encoding="utf-8") as f:
+                        f.write(linea)
+                    os.chmod(cred_file, 0o600)
             run(["git", "add", "."], cwd=str(REPO))
             run(["git", "commit", "-m", msg], cwd=str(REPO))
             remotos = run(["git", "remote"], cwd=str(REPO))
             if "origin" in remotos:
                 run(["git", "remote", "remove", "origin"], cwd=str(REPO))
-            run(["git", "remote", "add", "origin", auth_url], cwd=str(REPO))
+            run(["git", "remote", "add", "origin", url], cwd=str(REPO))
             print(run(["git", "push", "-u", "origin", "main"], timeout=180, cwd=str(REPO)))
         elif op == "5":
             if not (REPO / ".git").exists():
-                print(f"{R}[!] No hay repo local.{RESET}"); pausa(); continue
+                print(f"  {R}[!] No hay repo local.{RESET}"); pausa(); continue
             out = run(["git", "pull", "origin", "main"], timeout=180, cwd=str(REPO))
             print(out)
             if "Already up to date" not in out and "Ya está actualizado" not in out:
                 if (REPO / "arsenal.py").exists():
                     shutil.copy(REPO / "arsenal.py", Path.home() / "arsenal.py")
-                    print(f"{G}[+] arsenal.py actualizado.{RESET}")
+                    print(f"  {G}[✓] arsenal.py actualizado.{RESET}")
         elif op == "6":
             print(run(["git", "log", "--oneline", "-20"], cwd=str(REPO)))
         elif op == "7":
             if not URL_FILE.exists():
-                print(f"{R}[!] Configurá la URL primero.{RESET}"); pausa(); continue
+                print(f"  {R}[!] Configurá la URL primero.{RESET}"); pausa(); continue
             url = URL_FILE.read_text().strip()
             if (REPO / ".git").exists():
-                print(f"{Y}[!] Ya hay un repo.{RESET}")
+                print(f"  {Y}[!] Ya hay un repo.{RESET}")
             else:
                 print(run(["git", "clone", url, "repo"], timeout=300, cwd=str(BASE)))
         else:
-            print(f"{R}Opción inválida.{RESET}"); continue
+            print(f"  {R}[!] Opción inválida.{RESET}"); continue
         pausa()
 
-# ============ SUBMENÚ: MAPEO DE CÁMARAS ============
+# ============ SUBMENÚ: CÁMARAS ============
 def menu_camaras():
-    banner("MAPEO DE CÁMARAS IP")
-    print(f"{Y}[!] Solo en tu red local, con autorización.{RESET}\n")
+    banner("📷  MAPEO DE CÁMARAS IP")
+    print(f"  {Y}[!] Solo en tu red local, con autorización.{RESET}\n")
     net = detectar_red_actual()
     if not net:
-        print(f"{R}[!] No pude detectar la red.{RESET}"); pausa(); return
+        print(f"  {R}[!] No pude detectar la red.{RESET}"); pausa(); return
     red = net["red"]
-    print(f"{G}[+] Red detectada: {red}{RESET}\n")
+    print(f"  {G}[✓] Red: {red}{RESET}\n")
     if not pedir_confirmacion(f"¿Escanear {red}?"): return
     out = run(["nmap", "-sn", red], timeout=300)
     ips = []
@@ -795,7 +826,7 @@ def menu_camaras():
             ip = linea.split("(")[-1].split(")")[0] if "(" in linea else linea.split()[-1]
             ips.append(ip)
     if not ips:
-        print(f"{R}[!] No se encontraron hosts.{RESET}"); pausa(); return
+        print(f"  {R}[!] No se encontraron hosts.{RESET}"); pausa(); return
     puertos_cam = "80,443,554,8000,8080,8554,34567,37777,8081"
     camaras = []
     for ip in ips:
@@ -806,24 +837,28 @@ def menu_camaras():
             camaras.append((ip, abiertos, "CÁMARA"))
         elif any(p in abiertos for p in ["80", "443", "8000", "8080", "8081"]):
             camaras.append((ip, abiertos, "candidato"))
-    rep = [f"# Mapeo cámaras - {datetime.now():%Y-%m-%d %H:%M}", "", f"Red: {red}", "",
-           "| IP | MAC | Fabricante | Puertos | Tipo |", "|---|---|---|---|---|"]
+    rep = [f"# Mapeo cámaras - {datetime.now():%Y-%m-%d %H:%M}", "", f"Red: {red}", ""]
     for ip, puertos, tipo in camaras:
         mac = obtener_mac(ip); fab = fabricante(mac)
         color = G if tipo == "CÁMARA" else Y
-        print(f"{color}[{tipo}]{RESET} {ip}")
-        print(f"  MAC: {mac}  |  Fabricante: {fab}")
-        print(f"  Puertos: {', '.join(puertos)}\n")
-        rep.append(f"| {ip} | {mac} | {fab} | {', '.join(puertos)} | {tipo} |")
+        header = f"┌─ [{tipo}] {ip} "
+        vis = ancho_visual(header)
+        relleno = max(0, 50 - vis)
+        print(f"  {color}{header}{'─'*relleno}{RESET}")
+        print(f"  │  {DIM}MAC:{RESET} {mac}")
+        print(f"  │  {DIM}Fabricante:{RESET} {fab}")
+        print(f"  │  {DIM}Puertos:{RESET} {', '.join(puertos)}")
+        print(f"  └{'─'*49}\n")
+        rep.append(f"- {ip} | {mac} | {fab} | {', '.join(puertos)} | {tipo}")
     p = guardar(f"mapeo_camaras_{SESSION}.md", "\n".join(rep))
-    print(f"{G}[+] Reporte: {p}{RESET}")
+    print(f"  {G}[✓] Reporte: {p}{RESET}")
     pausa()
 
 # ============ REPORTES / LOGS ============
 def generar_reporte():
-    banner("REPORTE DE SESIÓN")
+    banner("📄  REPORTE DE SESIÓN")
     if not LOG_FILE.exists():
-        print(f"{R}No hay logs.{RESET}"); pausa(); return
+        print(f"  {R}No hay logs.{RESET}"); pausa(); return
     contenido = LOG_FILE.read_text(encoding="utf-8")
     lineas = [l for l in contenido.splitlines() if "CMD:" in l or "Aviso" in l or "Scope" in l]
     salidas = list(OUTS.glob(f"*{SESSION}*.txt"))
@@ -838,17 +873,17 @@ def generar_reporte():
     for s in salidas: reporte.append(f"- `{s.name}` ({s.stat().st_size} bytes)")
     p = OUTS / f"reporte_{SESSION}.md"
     p.write_text("\n".join(reporte), encoding="utf-8")
-    print(f"{G}[+] Reporte: {p}{RESET}")
+    print(f"  {G}[✓] Reporte: {p}{RESET}")
     pausa()
 
 def ver_logs():
-    banner("HISTORIAL DE LOGS")
+    banner("📋  HISTORIAL DE LOGS")
     archivos = sorted(LOGS.glob("auditoria_*.log"), reverse=True)[:10]
     if not archivos:
-        print(f"{DIM}No hay logs.{RESET}"); pausa(); return
+        print(f"  {DIM}No hay logs.{RESET}"); pausa(); return
     for i, f in enumerate(archivos, 1):
         print(f"  {C}[{i}]{RESET} {f.name}  {DIM}({f.stat().st_size} bytes){RESET}")
-    op = input(f"\n{C}Ver cuál (número) o ENTER: {RESET}").strip()
+    op = input(f"\n  {C}▶ Ver cuál: {RESET}").strip()
     if op.isdigit() and 1 <= int(op) <= len(archivos):
         print(archivos[int(op)-1].read_text(encoding="utf-8"))
     pausa()
@@ -858,33 +893,33 @@ def main():
     aviso_autorizacion()
     net = detectar_red_actual()
     opciones = [
-        ("1",  "Escaneo de Red",      "Puertos, hosts, inventario"),
-        ("2",  "Análisis Web / SSL",  "Headers, SSL, whois, DNS"),
-        ("3",  "Criptografía",        "Hashes e integridad"),
-        ("4",  "Monitoreo RTSP",      "Cámaras IP (autorizado)"),
-        ("5",  "Sockets / Netcat",    "Escucha y captura local"),
-        ("6",  "Auditoría Wi-Fi",     "Interfaces inalámbricas"),
-        ("7",  "Wordlists",           "Gestión de diccionarios"),
-        ("8",  "Chat IA",             "Asistente de seguridad"),
-        ("9",  "GitHub Sync",         "Subir/bajar a VS Code"),
-        ("10", "Generar Reporte",     "Exportar sesión a .md"),
-        ("11", "Ver Historial",       "Últimas sesiones"),
-        ("12", "Mapeo de Cámaras",    "Detectar cámaras en tu red"),
-        ("0",  "Salir",               ""),
+        ("1",  "🔍", "Escaneo de Red", "Puertos, hosts, inventario"),
+        ("2",  "🌐", "Análisis Web / SSL", "Headers, SSL, whois"),
+        ("3",  "🔐", "Criptografía", "Hashes e integridad"),
+        ("4",  "📡", "Monitoreo RTSP", "Cámaras IP"),
+        ("5",  "🔌", "Sockets / Netcat", "Escucha y captura"),
+        ("6",  "📶", "Auditoría Wi-Fi", "Interfaces inalámbricas"),
+        ("7",  "📖", "Wordlists", "Diccionarios"),
+        ("8",  "🤖", "Chat IA", "Asistente de seguridad"),
+        ("9",  "☁", "GitHub Sync", "Subir/bajar a VS Code"),
+        ("10", "📄", "Generar Reporte", "Exportar sesión"),
+        ("11", "📋", "Ver Historial", "Últimas sesiones"),
+        ("12", "📷", "Mapeo de Cámaras", "Detectar cámaras IP"),
+        ("0",  "❌", "Salir", ""),
     ]
     while True:
         banner()
         if net:
-            print(f"{DIM}Red actual: {net['red']}  |  Router: {net['router']}{RESET}")
-            print(f"{C}{'-'*55}{RESET}")
+            print(f"  {DIM}🌐 Red: {net['red']}   ·   Router: {net['router']}{RESET}")
+            print(f"  {C}{'─'*54}{RESET}")
         menu_opciones(opciones)
-        print(f"{DIM}Ctrl+X sale del script en cualquier momento{RESET}")
-        print(f"{C}{'-'*55}{RESET}")
+        print(f"  {DIM}💡 Ctrl+X salir  ·  Ctrl+C volver  ·  ENTER aceptar{RESET}")
+        print(f"  {C}{'─'*54}{RESET}")
         try:
-            op = _input_menu(f"{C}Seleccioná opción [0-12]: {RESET}").strip()
+            op = _input_menu(f"  {C}▶ Seleccioná opción [0-12]: {RESET}").strip()
         except (EOFError, KeyboardInterrupt):
             print(); break
-        log(f"Menú principal: opción {op}")
+        log(f"Menú: opción {op}")
         try:
             if   op == "1":  menu_escaneo()
             elif op == "2":  menu_web()
@@ -899,17 +934,17 @@ def main():
             elif op == "11": ver_logs()
             elif op == "12": menu_camaras()
             elif op == "0":
-                print(f"\n{G}Sesión guardada en {LOG_FILE}{RESET}")
+                print(f"\n  {G}[✓] Sesión guardada en {LOG_FILE}{RESET}")
                 break
             else:
-                print(f"{R}Opción inválida.{RESET}"); pausa()
+                print(f"  {R}[!] Opción inválida.{RESET}"); pausa()
         except KeyboardInterrupt:
-            print(f"\n{Y}Operación cancelada.{RESET}"); continue
+            print(f"\n  {Y}↩  Operación cancelada.{RESET}"); continue
 
 if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        print(f"\n\n{Y}Interrumpido.{RESET}")
-        print(f"{DIM}Logs: {LOG_FILE}{RESET}")
+        print(f"\n\n  {Y}👋 Interrumpido.{RESET}")
+        print(f"  {DIM}Logs: {LOG_FILE}{RESET}")
         sys.exit(0)
