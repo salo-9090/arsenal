@@ -355,7 +355,7 @@ def menu_ia():
         key_file.write_text(key, encoding="utf-8")
         os.chmod(key_file, 0o600)
     key = key_file.read_text(encoding="utf-8").strip()
-    modelo = "llama-3.1-8b-instant"
+    modelo = modelo = "openai/gpt-oss-20b"
     print(f"{DIM}Modelo: {modelo} | escribí 'salir' para volver{RESET}\n")
 
     historial = [{
@@ -383,14 +383,36 @@ def menu_ia():
         ]
         try:
             res = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+            if not res.stdout.strip():
+                print(f"{R}[!] Sin respuesta de Groq. ¿Hay internet?{RESET}")
+                historial.pop()
+                continue
             data = json.loads(res.stdout)
+            if "error" in data:
+                err = data["error"].get("message", "desconocido")
+                print(f"{R}[!] Error de Groq: {err}{RESET}")
+                historial.pop()
+                continue
+            if "choices" not in data:
+                print(f"{R}[!] Respuesta inesperada de Groq:{RESET}")
+                print(f"{DIM}{res.stdout[:400]}{RESET}")
+                historial.pop()
+                continue
             respuesta = data["choices"][0]["message"]["content"]
             historial.append({"role": "assistant", "content": respuesta})
             print(f"\n{G}IA>{RESET} {respuesta}\n")
             log(f"IA respuesta: {respuesta[:300]}")
+        except subprocess.TimeoutExpired:
+            print(f"{R}[!] Timeout. La IA tardó demasiado.{RESET}")
+            historial.pop()
+        except json.JSONDecodeError:
+            print(f"{R}[!] Groq devolvió algo que no es JSON:{RESET}")
+            print(f"{DIM}{res.stdout[:400]}{RESET}")
+            historial.pop()
         except Exception as e:
             print(f"{R}[!] Error: {e}{RESET}")
             log(f"Error IA: {e}", "error")
+            historial.pop()
 
 # ============ GITHUB SYNC ============
 def menu_github():
